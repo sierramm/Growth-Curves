@@ -1,0 +1,254 @@
+---
+title: "growth_curve_analysis_071223"
+author: "Sierra Mellor"
+date: "2023-06-30"
+output: html_document
+---
+
+gcplyr walk-through: https://mikeblazanin.github.io/gcplyr/articles/gcplyr.html 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install Packages
+
+```{r}
+install.packages("gcplyr")
+install.packages("lubridate")
+```
+
+## Load Libraries
+
+```{r, echo=FALSE}
+library(gcplyr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+```
+
+## Import and Transform Data
+
+```{r}
+## import data as wide format
+# save data in csv format
+# data is wide-shaped (each row is a timepoint, each column is a well from the pate)
+wide_data_0712_pidCas9 <- read_wides("071223_GC_pidCas9_data.csv") # data from one plate
+wide_data_0712_pidSpryC <- read_wides("071223_GC_pidSpryC_data.csv") # data from a different plate
+
+head(wide_data_0712_pidCas9)
+head(wide_data_0712_pidSpryC)
+
+## transform to tidy format
+# tidy-shaped: each unique measurement has its own row
+# use trans_wide_to_tidy, specify wide data frame and which columns are not data
+tidy_data_0712_pidCas9 <- trans_wide_to_tidy(
+  wides = wide_data_0712_pidCas9,
+  id_cols = c("file", "Time"))
+
+tidy_data_0712_pidSpryC <- trans_wide_to_tidy(
+  wides = wide_data_0712_pidSpryC,
+  id_cols = c("file", "Time"))
+
+str(tidy_data_0712_pidCas9)
+head(tidy_data_0712_pidCas9)
+```
+
+## Create Design Information
+
+```{r}
+# design for first plate
+design_0712_pidCas9 <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("10", "11", "12", "13", "empty"), # values
+    2:6, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "ABCDE", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    1:8,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3,1,2,3,1,2,3),
+    2:6,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9"),
+    2:6,
+    2:10,
+    "AAAAA",
+    FALSE
+  ) # set design for plasmid
+)
+
+# design for second plate
+design_0712_pidSpryC <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("10", "11", "12", "13", "empty"), # values
+    2:6, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "ABCDE", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    1:8,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3,1,2,3,1,2,3),
+    2:6,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidSpryC"),
+    2:6,
+    2:10,
+    "AAAAA",
+    FALSE
+  ) # set design for plasmid
+)
+```
+
+## Merge and Clean up Data
+
+```{r}
+# merge data and design data frames
+data_design_0712_pidCas9 <- merge_dfs(tidy_data_0712_pidCas9, design_0712_pidCas9)
+data_design_0712_pidSpryC <- merge_dfs(tidy_data_0712_pidSpryC, design_0712_pidSpryC)
+str(data_design_0712_pidCas9)
+head(data_design_0712_pidCas9)
+
+# put together data from the two plates (use to plot all data together)
+data_design_0712_all <- rbind(data_design_0712_pidCas9, data_design_0712_pidSpryC)
+
+# convert time to numeric
+# hms() since data has hours, minutes, and seconds (use hm() for hours & minutes)
+# set unit to be hours (defaults to seconds)
+data_design_0712_all$Time <- time_length(hms(data_design_0712_all$Time), unit = "hour")
+str(data_design_0712_all)
+
+# reorder Well and Guide levels so they appear in the correct order
+# this part generates A1-H12: paste(rep(LETTERS[1:8], each=12), 1:12, sep="")
+data_design_0712_all$Well <- factor(data_design_0712_all$Well,
+                                       levels=paste(rep(LETTERS[1:8], each=12), 1:12, sep=""))
+data_design_0712_all$Guide <- factor(data_design_0712_all$Guide,
+                                        levels=c("empty", "10", "11", "12", "13"))
+
+# omit NA wells (use to plot only experimental wells)
+data_design_0712_filtered <- data_design_0712_all %>%
+  filter(!is.na(Guide))
+
+# exclude other data if needed (contamination, etc)
+
+# regenerate separate pidCas9 and pidSpryC tables (use to plot plates separately)
+data_design_0712_pidCas9 <- data_design_0712_all %>%
+  filter(file=="071223_GC_pidCas9_data")
+
+data_design_0712_pidSpryC <- data_design_0712_all %>%
+  filter(file=="071223_GC_pidSpryC_data")
+```
+
+## Plot Curves
+
+```{r}
+# labels for ATC concentration
+ATC_labs <- c("0 uM", "0.4 uM", "1 uM")
+names(ATC_labs) <- c("0", "0.4", "1")
+
+# labels for guides
+guide_labs <- c("Empty", "Guide 10 (NGG)", "Guide 11 (NAN)", "Guide 12 (NAN)", "Guide 13 (NNN)")
+names(guide_labs) <- c("empty", "10", "11", "12", "13")
+
+# plot by well - pidCas9 plate
+ggplot(data = data_design_0712_pidCas9, aes(x=Time, y=Measurements, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Well, nrow = 8, ncol = 12)
+
+# plot by well - pidSpryC plate
+ggplot(data = data_design_0712_pidSpryC, aes(x=Time, y=Measurements, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Well, nrow = 8, ncol = 12)
+
+# plot replicates on same graph with all combined data
+ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Replicate)) +
+  geom_line() +
+  facet_grid(rows=vars(Guide), cols = vars(Vector, ATC_uM), 
+             labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
+  labs(y = "OD 600", x = "Time (hours)") +
+  theme_bw() 
+
+```
+
+
+## Calculate lag time, max growth rate, area under curve (total growth)
+
+```{r}
+# calculate per capita derivative
+data_design_0712_filtered <-  data_design_0712_filtered %>%
+  group_by(Well, Guide, ATC_uM, Vector, Replicate) %>%
+  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = TRUE, blank = 0))
+
+# plot per capita derivatives
+ggplot(data=data_design_0712_filtered, aes(x=Time, y=deriv_percap)) +
+  geom_line() +
+  facet_wrap(~Well + Vector, scales="free")
+
+
+
+
+
+
+# calculate lag time, maximum growth rate, time at maximum growth rate, area under curve
+# group by all variables so that you end up with one row per well
+# make sure not to group by anything that varies wtihin a well
+data_0627_sum <- data_design_merged_0627 %>%
+  group_by(Well, Guide, uM_ATC, Plasmid, Replicate) %>%
+  summarize(min_dens = first_minima(Measurements, return="y"), # use for lag time
+    lag_time = lag_time(y=Measurements, x=Time, deriv = deriv_percap, y0 = min_dens),
+    max_growth_rate = max_gc(deriv_percap, na.rm=T),
+    time_max_growth = extr_val(Time, which_max_gc(deriv_percap)),
+    area_under_curve = auc(x=Time, y=Measurements))
+
+# plot lag time
+ggplot(data_0627_sum, aes(x=uM_ATC, y=lag_time, color = uM_ATC)) +
+  geom_point() +
+  facet_grid(rows = vars(Plasmid), cols = vars(Guide),
+             labeller = labeller(Guide = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", title = "Lag Time for Guides 10-13")
+
+# plot max growth rate
+ggplot(data_0627_sum, aes(x=uM_ATC, y=max_growth_rate, color = uM_ATC)) +
+  geom_point() +
+  facet_grid(rows = vars(Plasmid), cols = vars(Guide),
+             labeller = labeller(Guide = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", title = "Maximum Growth Rates for Guides 10-13")
+
+# plot area under curve
+ggplot(data_0627_sum, aes(x=uM_ATC, y=area_under_curve, color = uM_ATC)) +
+  geom_point() +
+  facet_grid(rows = vars(Plasmid), cols = vars(Guide),
+             labeller = labeller(Guide = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Area Under Curve", title = "Area Under Curve for Guides 10-13 Growth Assay")
+```
+
+
