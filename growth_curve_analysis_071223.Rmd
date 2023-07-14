@@ -196,15 +196,19 @@ ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Repli
   theme_bw() 
 
 # raw data is "jumpy" - include smoothing (not always needed)
-ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Replicate)) +
+growth_curve_plot_0712 <- ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Replicate)) +
   geom_smooth(span=0.25, se=FALSE) + # adjust span to change amount of smoothing
   facet_grid(rows=vars(Guide), cols = vars(Vector, ATC_uM), 
              labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
   labs(y = "OD 600", x = "Time (hours)", 
        title = "Guides 10-13 Growth Assay", caption = "From July 12, 2023") +
-  theme_bw() 
+  theme_bw() +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
 
-
+# save plot as png
+ggsave("071223_growthcurves.png", plot = growth_curve_plot_0712)
 ```
 
 
@@ -237,31 +241,46 @@ data_0712_sum <- data_design_0712_filtered %>%
   ungroup()
 
 # plot lag time
-ggplot(data_0712_sum, aes(x=ATC_uM, y=lag_time, color = ATC_uM)) +
+lagtime_plot_0712 <- ggplot(data_0712_sum, aes(x=ATC_uM, y=lag_time, color = ATC_uM)) +
   geom_point() +
   facet_grid(rows = vars(Vector), cols = vars(Guide),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", 
-       title = "Lag Time for Guides 10-13 Growth Assay", caption = "From July 12, 2023")
+       title = "Lag Time for Guides 10-13 Growth Assay", caption = "From July 12, 2023") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("071223_lagTimePlot.png", plot = lagtime_plot_0712)
 
 # plot max growth rate
-ggplot(data_0712_sum, aes(x=ATC_uM, y=max_growth_rate, color = ATC_uM)) +
+maxgrowthrate_plot_0712 <- ggplot(data_0712_sum, aes(x=ATC_uM, y=max_growth_rate, color = ATC_uM)) +
   geom_point() +
   facet_grid(rows = vars(Vector), cols = vars(Guide),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", 
-       title = "Maximum Growth Rates for Guides 10-13 Growth Assay", caption = "From July 12, 2023")
+       title = "Maximum Growth Rates for Guides 10-13 Growth Assay", caption = "From July 12, 2023") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("071223_maxGrowthRatePlot.png", plot = maxgrowthrate_plot_0712)
 
 # plot area under curve
-ggplot(data_0712_sum, aes(x=ATC_uM, y=area_under_curve, color = ATC_uM)) +
+auc_plot_0712 <- ggplot(data_0712_sum, aes(x=ATC_uM, y=area_under_curve, color = ATC_uM)) +
   geom_point() +
   facet_grid(rows = vars(Vector), cols = vars(Guide),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Area Under Curve", 
-       title = "Area Under Curve for Guides 10-13 Growth Assay", caption = "From July 12, 2023")
+       title = "Area Under Curve for Guides 10-13 Growth Assay", caption = "From July 12, 2023") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("071223_areaUnderCurvePlot.png", plot = auc_plot_0712)
 ```
 
 
