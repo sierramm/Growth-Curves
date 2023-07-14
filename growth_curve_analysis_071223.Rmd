@@ -12,13 +12,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Install Packages
+Only need to install packages once
 
 ```{r}
 install.packages("gcplyr")
+install.packages("dplyr")
+install.packages("ggplot2")
 install.packages("lubridate")
 ```
 
 ## Load Libraries
+Load libraries every time
 
 ```{r, echo=FALSE}
 library(gcplyr)
@@ -28,6 +32,7 @@ library(lubridate)
 ```
 
 ## Import and Transform Data
+Save data in .csv format first
 
 ```{r}
 ## import data as wide format
