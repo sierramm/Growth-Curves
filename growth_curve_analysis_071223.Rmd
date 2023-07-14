@@ -176,12 +176,12 @@ names(ATC_labs) <- c("0", "0.4", "1")
 guide_labs <- c("Empty", "Guide 10 (NGG)", "Guide 11 (NAN)", "Guide 12 (NAN)", "Guide 13 (NNN)")
 names(guide_labs) <- c("empty", "10", "11", "12", "13")
 
-# plot by well - pidCas9 plate
+# plot by well - pidCas9 plate (just to take a look at data)
 ggplot(data = data_design_0712_pidCas9, aes(x=Time, y=Measurements, color = ATC_uM)) +
   geom_line() +
   facet_wrap(~Well, nrow = 8, ncol = 12)
 
-# plot by well - pidSpryC plate
+# plot by well - pidSpryC plate (just to take a look at data)
 ggplot(data = data_design_0712_pidSpryC, aes(x=Time, y=Measurements, color = ATC_uM)) +
   geom_line() +
   facet_wrap(~Well, nrow = 8, ncol = 12)
@@ -191,8 +191,19 @@ ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Repli
   geom_line() +
   facet_grid(rows=vars(Guide), cols = vars(Vector, ATC_uM), 
              labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
-  labs(y = "OD 600", x = "Time (hours)") +
+  labs(y = "OD 600", x = "Time (hours)", 
+       title = "Guides 10-13 Growth Assay", caption = "From July 12, 2023") +
   theme_bw() 
+
+# raw data is "jumpy" - include smoothing (not always needed)
+ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Replicate)) +
+  geom_smooth(span=0.25, se=FALSE) + # adjust span to change amount of smoothing
+  facet_grid(rows=vars(Guide), cols = vars(Vector, ATC_uM), 
+             labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
+  labs(y = "OD 600", x = "Time (hours)", 
+       title = "Guides 10-13 Growth Assay", caption = "From July 12, 2023") +
+  theme_bw() 
+
 
 ```
 
@@ -201,54 +212,56 @@ ggplot(data = data_design_0712_filtered, aes(x=Time, y=Measurements, color=Repli
 
 ```{r}
 # calculate per capita derivative
+# include trans_y and window_width_n for smoothing if data is really "jumpy" (may not be needed)
 data_design_0712_filtered <-  data_design_0712_filtered %>%
   group_by(Well, Guide, ATC_uM, Vector, Replicate) %>%
-  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = TRUE, blank = 0))
+  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = TRUE, blank = 0,
+                                   window_width_n=5, trans_y="log")) %>% # smoothing
+  ungroup()
 
 # plot per capita derivatives
 ggplot(data=data_design_0712_filtered, aes(x=Time, y=deriv_percap)) +
   geom_line() +
   facet_wrap(~Well + Vector, scales="free")
 
-
-
-
-
-
 # calculate lag time, maximum growth rate, time at maximum growth rate, area under curve
 # group by all variables so that you end up with one row per well
-# make sure not to group by anything that varies wtihin a well
-data_0627_sum <- data_design_merged_0627 %>%
-  group_by(Well, Guide, uM_ATC, Plasmid, Replicate) %>%
-  summarize(min_dens = first_minima(Measurements, return="y"), # use for lag time
-    lag_time = lag_time(y=Measurements, x=Time, deriv = deriv_percap, y0 = min_dens),
-    max_growth_rate = max_gc(deriv_percap, na.rm=T),
-    time_max_growth = extr_val(Time, which_max_gc(deriv_percap)),
-    area_under_curve = auc(x=Time, y=Measurements))
+# make sure not to group by anything that varies within a well
+data_0712_sum <- data_design_0712_filtered %>%
+  group_by(Well, Guide, ATC_uM, Vector, Replicate) %>%
+  summarize(min_dens = first_minima(Measurements, return="y"), # use for calculating lag time
+    lag_time = lag_time(y=Measurements, x=Time, deriv = deriv_percap, y0 = min_dens), # lag time
+    max_growth_rate = max_gc(deriv_percap, na.rm=T), # maximum growth rate
+    time_max_growth = extr_val(Time, which_max_gc(deriv_percap)), # time at maximum growth rate
+    area_under_curve = auc(x=Time, y=Measurements)) %>% # area under curve
+  ungroup()
 
 # plot lag time
-ggplot(data_0627_sum, aes(x=uM_ATC, y=lag_time, color = uM_ATC)) +
+ggplot(data_0712_sum, aes(x=ATC_uM, y=lag_time, color = ATC_uM)) +
   geom_point() +
-  facet_grid(rows = vars(Plasmid), cols = vars(Guide),
+  facet_grid(rows = vars(Vector), cols = vars(Guide),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
-  labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", title = "Lag Time for Guides 10-13")
+  labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", 
+       title = "Lag Time for Guides 10-13 Growth Assay", caption = "From July 12, 2023")
 
 # plot max growth rate
-ggplot(data_0627_sum, aes(x=uM_ATC, y=max_growth_rate, color = uM_ATC)) +
+ggplot(data_0712_sum, aes(x=ATC_uM, y=max_growth_rate, color = ATC_uM)) +
   geom_point() +
-  facet_grid(rows = vars(Plasmid), cols = vars(Guide),
+  facet_grid(rows = vars(Vector), cols = vars(Guide),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
-  labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", title = "Maximum Growth Rates for Guides 10-13")
+  labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", 
+       title = "Maximum Growth Rates for Guides 10-13 Growth Assay", caption = "From July 12, 2023")
 
 # plot area under curve
-ggplot(data_0627_sum, aes(x=uM_ATC, y=area_under_curve, color = uM_ATC)) +
+ggplot(data_0712_sum, aes(x=ATC_uM, y=area_under_curve, color = ATC_uM)) +
   geom_point() +
-  facet_grid(rows = vars(Plasmid), cols = vars(Guide),
+  facet_grid(rows = vars(Vector), cols = vars(Guide),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
-  labs(x="ATC Concentration (uM)", y = "Area Under Curve", title = "Area Under Curve for Guides 10-13 Growth Assay")
+  labs(x="ATC Concentration (uM)", y = "Area Under Curve", 
+       title = "Area Under Curve for Guides 10-13 Growth Assay", caption = "From July 12, 2023")
 ```
 
 
