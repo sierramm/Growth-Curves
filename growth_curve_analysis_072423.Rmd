@@ -72,168 +72,99 @@ tidy_data_0718_ftsB <- trans_wide_to_tidy(
 
 ```{r}
 # design for first plate
-design_0718_dnaA <- make_design(
+design_0724_plate1 <- make_design(
   output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
   nrows = 8, ncols = 12, lookup_tbl_start = "A",
   Guide = list( 
-    c("14", "15", "16"), # values
+    c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"), # values
     2:7, # rows to apply to (those left out will be filled in with NA)
-    2:10, # columns to apply to
-    "AABBCC", # pattern of the values
+    1:12, # columns to apply to
+    paste(c(rep("ABCDEF",9), rep("GGGHHH", 3)), collapse=""), # pattern of the values
     FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
   ), # set design for guide
   ATC_uM = list( 
-    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    c(0,0.4,1),
     2:7,
-    2:10,
-    "ABCDEFGHI",
+    1:12,
+    paste(c(rep("AAABBBCCCAAAAAABBBCCCBBBAAABBBCCCCCC", 2)), collapse=""),
     TRUE
   ), # set design for ATC concentration
   Replicate = list(
-    c(1,2,3,1,2,3,1,2,3),
+    c(1,2,3),
     2:7,
-    2:10,
-    "ABCDEFGHI",
+    1:12,
+    "ABC",
     TRUE
   ), # set design for replicates
   Vector = list(
     c("pidCas9", "pidSpryC"),
     2:7,
-    2:10,
-    "AB",
-    FALSE
-  ), # set design for plasmid
-  Gene = list(
-    c("dnaA"),
-    2:7,
-    2:10,
+    1:12,
     "A",
-    FALSE
-  )
-)
-
-# design for second plate
-design_0718_fusA <- make_design(
-  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
-  nrows = 8, ncols = 12, lookup_tbl_start = "A",
-  Guide = list( 
-    c("17", "18", "19"), # values
-    2:7, # rows to apply to (those left out will be filled in with NA)
-    2:10, # columns to apply to
-    "AABBCC", # pattern of the values
-    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
-  ), # set design for guide
-  ATC_uM = list( 
-    c(0,0,0,0.4,0.4,0.4,1,1,1),
-    2:7,
-    2:10,
-    "ABCDEFGHI",
-    TRUE
-  ), # set design for ATC concentration
-  Replicate = list(
-    c(1,2,3,1,2,3,1,2,3),
-    2:7,
-    2:10,
-    "ABCDEFGHI",
-    TRUE
-  ), # set design for replicates
-  Vector = list(
-    c("pidCas9", "pidSpryC"),
-    2:7,
-    2:10,
-    "AB",
     FALSE
   ), # set design for plasmid
     Gene = list(
-    c("fusA"),
+    c("dnaA", "fusA", "proS", "ftsB", "empty"),
     2:7,
-    2:10,
-    "A",
+    1:12,
+    paste(c(rep("AAABBB",9), rep("CCCCCC", 3)), collapse=""),
     FALSE
-    )
-)
+    ), # set design for gene
+  PAM = list(
+    c("NGG", "NAN", "NNN"),
+    2:7,
+    1:12,
+    paste(c(rep("ABCABC",9), rep("AAABBB", 3)), collapse=""),
+    FALSE
+  )
+) 
 
-# design for third plate
-design_0718_proS <- make_design(
+design_0724_plate2 <- make_design(
   output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
   nrows = 8, ncols = 12, lookup_tbl_start = "A",
   Guide = list( 
-    c("20", "21", "22"), # values
+    c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"), # values
     2:7, # rows to apply to (those left out will be filled in with NA)
     2:10, # columns to apply to
-    "AABBCC", # pattern of the values
+    "IJKLMN", # pattern of the values
     FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
   ), # set design for guide
   ATC_uM = list( 
-    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    c(0,0.4,1),
     2:7,
     2:10,
-    "ABCDEFGHI",
+    "AAABBBCCC",
     TRUE
   ), # set design for ATC concentration
   Replicate = list(
-    c(1,2,3,1,2,3,1,2,3),
+    c(1,2,3),
     2:7,
     2:10,
-    "ABCDEFGHI",
+    "ABC",
     TRUE
   ), # set design for replicates
   Vector = list(
     c("pidCas9", "pidSpryC"),
     2:7,
     2:10,
-    "AB",
-    FALSE
-  ), # set design for plasmid
-      Gene = list(
-    c("proS"),
-    2:7,
-    2:10,
     "A",
     FALSE
-    )
-)
-
-# design for fourth plate
-design_0718_ftsB <- make_design(
-  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
-  nrows = 8, ncols = 12, lookup_tbl_start = "A",
-  Guide = list( 
-    c("23", "24", "25"), # values
-    2:7, # rows to apply to (those left out will be filled in with NA)
-    2:10, # columns to apply to
-    "AABBCC", # pattern of the values
-    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
-  ), # set design for guide
-  ATC_uM = list( 
-    c(0,0,0,0.4,0.4,0.4,1,1,1),
-    2:7,
-    2:10,
-    "ABCDEFGHI",
-    TRUE
-  ), # set design for ATC concentration
-  Replicate = list(
-    c(1,2,3,1,2,3,1,2,3),
-    2:7,
-    2:10,
-    "ABCDEFGHI",
-    TRUE
-  ), # set design for replicates
-  Vector = list(
-    c("pidCas9", "pidSpryC"),
-    2:7,
-    2:10,
-    "AB",
-    FALSE
   ), # set design for plasmid
-      Gene = list(
-    c("ftsB"),
+    Gene = list(
+    c("dnaA", "fusA", "proS", "ftsB", "empty"),
     2:7,
     2:10,
-    "A",
+    "CDDDDE",
     FALSE
-    )
-)
+    ), # set design for gene
+  PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "CABBCD",
+    FALSE
+  )
+) 
 
 ```
 
