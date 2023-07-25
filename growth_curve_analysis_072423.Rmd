@@ -40,29 +40,19 @@ Save data in .csv format first
 ## import data as wide format
 # save data in csv format
 # data is wide-shaped (each row is a timepoint, each column is a well from the pate)
-wide_data_0718_dnaA <- read_wides("071823_gc_data_plate1.csv") # data from plate 1
-wide_data_0718_fusA <- read_wides("071823_gc_data_plate2.csv") # data from plate 2
-wide_data_0718_proS <- read_wides("071823_gc_data_plate3.csv") # data from plate 3
-wide_data_0718_ftsB <- read_wides("071823_gc_data_plate4.csv") # data from plate 4
+wide_data_0724_plate1 <- read_wides("072423_gc_data_plate1.csv") # data from plate 1
+wide_data_0724_plate2 <- read_wides("072423_gc_data_plate2.csv") # data from plate 2
 
 
 ## transform to tidy format
 # tidy-shaped: each unique measurement has its own row
 # use trans_wide_to_tidy, specify wide data frame and which columns are not data
-tidy_data_0718_dnaA <- trans_wide_to_tidy(
-  wides = wide_data_0718_dnaA,
+tidy_data_0724_plate1 <- trans_wide_to_tidy(
+  wides = wide_data_0724_plate1,
   id_cols = c("file", "Time"))
 
-tidy_data_0718_fusA <- trans_wide_to_tidy(
-  wides = wide_data_0718_fusA,
-  id_cols = c("file", "Time"))
-
-tidy_data_0718_proS <- trans_wide_to_tidy(
-  wides = wide_data_0718_proS,
-  id_cols = c("file", "Time"))
-
-tidy_data_0718_ftsB <- trans_wide_to_tidy(
-  wides = wide_data_0718_ftsB,
+tidy_data_0724_plate2 <- trans_wide_to_tidy(
+  wides = wide_data_0724_plate2,
   id_cols = c("file", "Time"))
 
 
@@ -125,42 +115,42 @@ design_0724_plate2 <- make_design(
   Guide = list( 
     c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"), # values
     2:7, # rows to apply to (those left out will be filled in with NA)
-    2:10, # columns to apply to
+    3:11, # columns to apply to
     "IJKLMN", # pattern of the values
     FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
   ), # set design for guide
   ATC_uM = list( 
     c(0,0.4,1),
     2:7,
-    2:10,
+    3:11,
     "AAABBBCCC",
     TRUE
   ), # set design for ATC concentration
   Replicate = list(
     c(1,2,3),
     2:7,
-    2:10,
+    3:11,
     "ABC",
     TRUE
   ), # set design for replicates
   Vector = list(
     c("pidCas9", "pidSpryC"),
     2:7,
-    2:10,
+    3:11,
     "A",
     FALSE
   ), # set design for plasmid
     Gene = list(
     c("dnaA", "fusA", "proS", "ftsB", "empty"),
     2:7,
-    2:10,
+    3:11,
     "CDDDDE",
     FALSE
     ), # set design for gene
   PAM = list(
     c("NGG", "NAN", "NNN", "empty"),
     2:7,
-    2:10,
+    3:11,
     "CABBCD",
     FALSE
   )
@@ -172,46 +162,42 @@ design_0724_plate2 <- make_design(
 
 ```{r}
 # merge data and design data frames
-data_design_0718_dnaA <- merge_dfs(tidy_data_0718_dnaA, design_0718_dnaA)
-data_design_0718_fusA <- merge_dfs(tidy_data_0718_fusA, design_0718_fusA)
-data_design_0718_proS <- merge_dfs(tidy_data_0718_proS, design_0718_proS)
-data_design_0718_ftsB <- merge_dfs(tidy_data_0718_ftsB, design_0718_ftsB)
+data_design_0724_plate1 <- merge_dfs(tidy_data_0724_plate1, design_0724_plate1)
+data_design_0724_plate2 <- merge_dfs(tidy_data_0724_plate2, design_0724_plate2)
 
 
 # put together data from the two plates (use to plot all data together)
-data_design_0718_all <- rbind(data_design_0718_dnaA, data_design_0718_fusA, data_design_0718_proS, data_design_0718_ftsB)
+data_design_0724_all <- rbind(data_design_0724_plate1, data_design_0724_plate2)
 
 # convert time to numeric
 # hms() since data has hours, minutes, and seconds (use hm() for hours & minutes)
 # set unit to be hours (defaults to seconds)
-data_design_0718_all$Time <- time_length(hms(data_design_0718_all$Time), unit = "hour")
-str(data_design_0718_all)
+data_design_0724_all$Time <- time_length(hms(data_design_0724_all$Time), unit = "hour")
+
 
 # reorder Well and Guide levels so they appear in the correct order
 # this part generates A1-H12: paste(rep(LETTERS[1:8], each=12), 1:12, sep="")
-data_design_0718_all$Well <- factor(data_design_0718_all$Well,
+data_design_0724_all$Well <- factor(data_design_0724_all$Well,
                                        levels=paste(rep(LETTERS[1:8], each=12), 1:12, sep=""))
-data_design_0718_all$Guide <- factor(data_design_0718_all$Guide,
-                                        levels=c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"))
+data_design_0724_all$Guide <- factor(data_design_0724_all$Guide,
+                                        levels=c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"))
+
+data_design_0724_all$Gene <- factor(data_design_0724_all$Gene, levels = c("dnaA", "fusA", "proS", "ftsB", "empty"))
+
+data_design_0724_all$PAM <- factor(data_design_0724_all$PAM, levels = c("NGG", "NAN", "NNN", "empty"))
 
 # omit NA wells (use to plot only experimental wells)
-data_design_0718_filtered <- data_design_0718_all %>%
+data_design_0724_filtered <- data_design_0724_all %>%
   filter(!is.na(Guide))
 
 # exclude other data if needed (contamination, etc)
 
-# regenerate separate pidCas9 and pidSpryC tables (use to plot plates separately)
-data_design_0718_dnaA <- data_design_0718_filtered %>%
-  filter(file=="071823_gc_data_plate1")
+# regenerate separate tables for plates 1 and 2 (use to plot plates separately)
+data_design_0724_plate1 <- data_design_0724_filtered %>%
+  filter(file=="072423_gc_data_plate1")
 
-data_design_0718_fusA<- data_design_0718_filtered %>%
-  filter(file=="071823_gc_data_plate2")
-
-data_design_0718_proS <- data_design_0718_filtered %>%
-  filter(file=="071823_gc_data_plate3")
-
-data_design_0718_ftsB <- data_design_0718_filtered %>%
-  filter(file=="071823_gc_data_plate4")
+data_design_0724_plate2 <- data_design_0724_filtered %>%
+  filter(file=="072423_gc_data_plate2")
 
 ```
 
@@ -225,36 +211,33 @@ names(ATC_labs) <- c("0", "0.4", "1")
 # labels for guides
 guide_labs <- c("Guide 14 (NGG)", "Guide 15 (NAN)", "Guide 16 (NNN)", "Guide 17 (NGG)",
                 "Guide 18 (NAN)", "Guide 19 (NNN)", "Guide 20 (NGG)", "Guide 21 (NAN)",
-                "Guide 22 (NNN)", "Guide 23 (NGG)", "Guide 24 (NAN)", "Guide 25 (NAN)")
-names(guide_labs) <- c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25")
+                "Guide 22 (NNN)", "Guide 23 (NGG)", "Guide 24 (NAN)", "Guide 25 (NAN)", "Guide 26 (NNN)", "Empty")
 
-# plot by well - dnaA plate (just to take a look at data)
-ggplot(data = data_design_0718_dnaA, aes(x=Time, y=Measurements, color = ATC_uM)) +
+guide_labs <- c("NGG", "NAN", "NNN", "NGG", "NAN", "NNN", "NGG", "NAN", "NNN", "NGG", "NAN", "NAN", "NNN", "Empty")
+
+guide_labs <- c("Guide 14", "Guide 15", "Guide 16", "Guide 17",
+                "Guide 18", "Guide 19", "Guide 20", "Guide 21",
+                "Guide 22", "Guide 23", "Guide 24", "Guide 25", "Guide 26", "empty")
+names(guide_labs) <- c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty")
+
+# plot by well - plate 1 (just to take a look at data)
+ggplot(data = data_design_0724_plate1, aes(x=Time, y=Measurements, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Well, nrow = 6, ncol = 12)
+
+# plot by well - plate 2 (just to take a look at data)
+ggplot(data = data_design_0724_plate2, aes(x=Time, y=Measurements, color = ATC_uM)) +
   geom_line() +
   facet_wrap(~Well, nrow = 6, ncol = 9)
 
-# plot by well - fusA plate (just to take a look at data)
-ggplot(data = data_design_0718_fusA, aes(x=Time, y=Measurements, color = ATC_uM)) +
-  geom_line() +
-  facet_wrap(~Well, nrow = 8, ncol = 12)
-
-# plot by well - proS plate (just to take a look at data)
-ggplot(data = data_design_0718_proS, aes(x=Time, y=Measurements, color = ATC_uM)) +
-  geom_line() +
-  facet_wrap(~Well, nrow = 8, ncol = 12)
-
-# plot by well - ftsB plate (just to take a look at data)
-ggplot(data = data_design_0718_ftsB, aes(x=Time, y=Measurements, color = ATC_uM)) +
-  geom_line() +
-  facet_wrap(~Well, nrow = 8, ncol = 12)
 
 # plot with everything
-growth_curve_plot_0718 <- ggplot(data = data_design_0718_filtered, aes(x=Time, y=Measurements, color = Replicate)) +
+growth_curve_plot_0724 <- ggplot(data = data_design_0724_filtered, aes(x=Time, y=Measurements, color = Replicate)) +
   geom_line() +
-  facet_grid(rows=vars(Guide), cols = vars(Vector, ATC_uM),
+  facet_grid(rows=vars(Gene, Guide), cols = vars(ATC_uM),
              labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
   labs(y = "OD 600", x = "Time (hours)", 
-       title = "Guides 14-25 Growth Assay", caption = "From July 18, 2023") +
+       title = "Guides 14-26 Growth Assay", caption = "From July 24, 2023") +
   theme_bw() +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
@@ -312,7 +295,7 @@ ftsB_plot <- ggplot(data = data_design_0718_ftsB, aes(x=Time, y=Measurements, co
 all_genes_plots <- ggarrange(dnaA_plot, fusA_plot, proS_plot, ftsB_plot, nrow =2, ncol = 2)
 
 # save plots as png
-ggsave("071823_growthcurves.png", plot =growth_curve_plot_0718)
+ggsave("072423_growthcurves.png", plot =growth_curve_plot_0724)
 ggsave("071823_growthcurve_bygene.png", plot = all_genes_plots)
 ```
 
@@ -322,23 +305,22 @@ ggsave("071823_growthcurve_bygene.png", plot = all_genes_plots)
 ```{r}
 # calculate per capita derivative
 # include trans_y and window_width_n for smoothing if data is really "jumpy" (may not be needed)
-data_design_0718_filtered <- data_design_0718_filtered %>%
+data_design_0724_filtered <- data_design_0724_filtered %>%
   group_by(Well, Guide, ATC_uM, Vector, Gene, Replicate) %>%
-  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = T, blank = 0,
-                                   window_width_n=5, trans_y="log")) %>%
+  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = T, blank = 0)) %>%
   ungroup()
 
 
 # plot per capita derivatives
-ggplot(data=(data_design_0718_filtered %>% filter(Gene=="proS")), aes(x=Time, y=deriv_percap)) +
+ggplot(data=data_design_0724_filtered, aes(x=Time, y=deriv_percap)) +
   geom_line() +
-  facet_wrap(~Well, scales="free")
+  facet_wrap(~Well+file, scales="free")
 
 # calculate lag time, maximum growth rate, time at maximum growth rate, area under curve
 # group by all variables so that you end up with one row per well
 # make sure not to group by anything that varies within a well
-data_0718_sum <- data_design_0718_filtered %>%
-  group_by(Well, Guide, ATC_uM, Vector, Replicate, Gene) %>%
+data_0724_sum <- data_design_0724_filtered %>%
+  group_by(file, Well, Guide, ATC_uM, Vector, Replicate, Gene, PAM) %>%
   summarize(min_dens = first_minima(Measurements, return="y"), # use for calculating lag time
     lag_time = lag_time(y=Measurements, x=Time, deriv = deriv_percap, y0 = min_dens), # lag time
     max_growth_rate = max_gc(deriv_percap, na.rm=T), # maximum growth rate
@@ -346,57 +328,48 @@ data_0718_sum <- data_design_0718_filtered %>%
     area_under_curve = auc(x=Time, y=Measurements)) %>% # area under curve
   ungroup()
 
-data_0718_sum <- data_0718_sum %>%
-  mutate(PAM = 
-           case_when(Guide %in% c("14", "17", "20", "23") ~ "NGG",
-                     Guide %in% c("15", "18", "21", "24", "25") ~ "NAN",
-                     Guide %in% c("16", "19", "22") ~ "NNN"))
-
-data_0718_sum$PAM <- factor(data_0718_sum$PAM, levels = c("NGG", "NAN", "NNN"))
-
-data_0718_sum_1 <- data_0718_sum %>% filter(PAM != "NNN")
 
 # plot lag time
-lagtime_plot_0718 <- ggplot(data_0718_sum_1, aes(x=ATC_uM, y=lag_time, color = ATC_uM)) +
+lagtime_plot_0724 <- ggplot(data_0724_sum, aes(x=ATC_uM, y=lag_time, color = ATC_uM)) +
   geom_point() +
   facet_grid(rows = vars(Gene), cols = vars(Vector, PAM),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", 
-       title = "Lag Time for Guides 14-25 Growth Assay", caption = "From July 18, 2023") +
+       title = "Lag Time for Guides 14-26 Growth Assay", caption = "From July 24, 2023") +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
 
-ggsave("071823_lagTimePlot_1.png", plot = lagtime_plot_0718)
+ggsave("072423_lagTimePlot.png", plot = lagtime_plot_0724)
 
 # plot max growth rate
-maxgrowthrate_plot_0718 <- ggplot(data_0718_sum_1, aes(x=ATC_uM, y=max_growth_rate, color = ATC_uM)) +
+maxgrowthrate_plot_0724 <- ggplot(data_0724_sum, aes(x=ATC_uM, y=max_growth_rate, color = ATC_uM)) +
   geom_point() +
   facet_grid(rows = vars(Gene), cols = vars(Vector, PAM),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", 
-       title = "Maximum Growth Rates for Guides 14-25 Growth Assay", caption = "From July 18, 2023") +
+       title = "Maximum Growth Rates for Guides 14-26 Growth Assay", caption = "From July 24, 2023") +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
 
-ggsave("071823_maxGrowthRatePlot_1.png", plot = maxgrowthrate_plot_0718)
+ggsave("072423_maxGrowthRatePlot.png", plot = maxgrowthrate_plot_0724)
 
 # plot area under curve
-auc_plot_0718 <- ggplot(data_0718_sum_1, aes(x=ATC_uM, y=area_under_curve, color = ATC_uM)) +
+auc_plot_0724 <- ggplot(data_0724_sum, aes(x=ATC_uM, y=area_under_curve, color = ATC_uM)) +
   geom_point() +
   facet_grid(rows = vars(Gene), cols = vars(Vector, PAM),
              labeller = labeller(Guide = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Area Under Curve", 
-       title = "Area Under Curve for Guides 14-25 Growth Assay", caption = "From July 18, 2023") +
+       title = "Area Under Curve for Guides 14-26 Growth Assay", caption = "From July 24, 2023") +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
 
-ggsave("071823_areaUnderCurvePlot_1.png", plot = auc_plot_0718)
+ggsave("072423_areaUnderCurvePlot.png", plot = auc_plot_0724)
 ```
 
 
