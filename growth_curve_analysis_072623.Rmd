@@ -244,7 +244,7 @@ ggplot(data = data_design_0726_plate2, aes(x=Time, y=Measurements, color = ATC_u
 
 # plot with everything
 growth_curve_plot_0726 <- ggplot(data = data_design_0726_filtered, aes(x=Time, y=Measurements, color = Replicate)) +
-  geom_line() +
+  geom_smooth(span=0.15, se=FALSE) +
   facet_grid(rows=vars(Gene, Guide), cols = vars(ATC_uM),
              labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
   labs(y = "OD 600", x = "Time (hours)", 
@@ -260,7 +260,7 @@ ggsave("072623_growthcurves.png", plot =growth_curve_plot_0726)
 
 # plot with averages of replicates
 growth_curve_averages_0726 <- ggplot(data = data_design_0726_averages, aes(x=Time, y=Average, color = ATC_uM)) +
-  geom_line() +
+  geom_smooth(span=0.15, se=FALSE) +
   facet_wrap(~Gene + Guide, ncol = 3,
              labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
   labs(y = "OD 600", x = "Time (hours)", 
@@ -283,15 +283,20 @@ baseline_all_facets = merge(neg_control_data, data.frame(Guide = "empty", facet 
 
 data_for_plotting <- rbind(baseline_all_facets, experimental_data)
 
+# add color specification
+data_design_0726_averages <- data_design_0726_averages %>%
+  mutate(Group = case_when(Guide == "empty" ~ "Empty",
+                           Guide != "empty" ~ "Experimental"))
+
 # plot with averages of replicates + empty on all graphs
-gc_averages_0726 <- ggplot(data = data_for_plotting, aes(x=Time, y=Average, color = Guide)) +
+gc_averages_0726 <- ggplot(data = data_for_plotting, aes(x=Time, y=Average, color = Group)) +
   geom_line() +
-  facet_grid(rows=vars(ATC_uM), cols = vars(facet),
+  facet_grid(rows=vars(facet), cols = vars(ATC_uM),
              labeller = labeller(ATC_uM = ATC_labs, facet = guide_labs)) +
   labs(y = "OD 600", x = "Time (hours)", 
        title = "Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
   theme_bw() +
-  theme(strip.text = element_text(face="bold", size = 14),
+  theme(strip.text = element_text(face="bold", size = 12),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
 
@@ -364,7 +369,8 @@ ggsave("071823_growthcurve_bygene.png", plot = all_genes_plots)
 # include trans_y and window_width_n for smoothing if data is really "jumpy" (may not be needed)
 data_design_0726_filtered <- data_design_0726_filtered %>%
   group_by(Well, Guide, ATC_uM, Vector, Gene, Replicate) %>%
-  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = T, blank = 0)) %>%
+  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = T, blank = 0,
+                                   window_width_n=5, trans_y="log")) %>%
   ungroup()
 
 
@@ -433,7 +439,10 @@ data_0726_sum_avg <- data_0726_sum %>%
   group_by(file, Guide, ATC_uM, Vector, Gene, PAM) %>%
   summarize(lag_time_avg = mean(lag_time),
             max_growth_rate_avg = mean(max_growth_rate),
-            auc_avg = mean(area_under_curve))
+            auc_avg = mean(area_under_curve)) %>%
+  ungroup() %>%
+  mutate(Group = case_when(Guide == "empty" ~ "Empty",
+                           Guide != "empty" ~ "Experimental"))
 
 # create dataset that will allow for plotting empty as a baseline on all graphs
 neg_control_avg_data <- subset(data_0726_sum_avg, Guide == "empty")
@@ -445,13 +454,13 @@ baseline_all_facets_sum = merge(neg_control_avg_data, data.frame(Guide = "empty"
 plot_data_sum <- rbind(baseline_all_facets_sum, experimental_avg_data)
 
 # lag time plot w baseline
-lagtime_plot_avg_0726 <- ggplot(plot_data_sum, aes(x = ATC_uM, y= lag_time_avg, color = ATC_uM)) +
+lagtime_plot_avg_0726 <- ggplot(plot_data_sum, aes(x = ATC_uM, y= lag_time_avg, color = Group)) +
   geom_point() +
-  facet_grid(rows = vars(facet), cols = vars(PAM),
-             labeller = labeller(Guide = guide_labs)) +
+  facet_grid(rows = vars(facet),
+             labeller = labeller(facet = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", 
-       title = "Lag Time for Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
+       title = "Lag Time",) +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
@@ -459,13 +468,13 @@ lagtime_plot_avg_0726 <- ggplot(plot_data_sum, aes(x = ATC_uM, y= lag_time_avg, 
 ggsave("072623_lagtimeplot_avg.png", plot = lagtime_plot_avg_0726)
 
 # max growth rate plot w baseline
-maxgrowthrate_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=max_growth_rate_avg, color = ATC_uM)) +
+maxgrowthrate_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=max_growth_rate_avg, color = Group)) +
   geom_point() +
-  facet_grid(rows = vars(facet), cols = vars(PAM),
-             labeller = labeller(Guide = guide_labs)) +
+  facet_grid(rows = vars(facet),
+             labeller = labeller(facet = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", 
-       title = "Maximum Growth Rates for Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
+       title = "Maximum Growth Rate") +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
@@ -473,19 +482,29 @@ maxgrowthrate_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=max_growth_
 ggsave("072623_maxGrowthRatePlot_avg.png", plot = maxgrowthrate_plot_avg_0726)
 
 # area under curve plot w baseline
-auc_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=auc_avg, color = ATC_uM)) +
+auc_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=auc_avg, color = Group)) +
   geom_point() +
-  facet_grid(rows = vars(facet), cols = vars(PAM),
-             labeller = labeller(Guide = guide_labs)) +
+  facet_grid(rows = vars(facet),
+             labeller = labeller(facet = guide_labs)) +
   theme_bw() +
   labs(x="ATC Concentration (uM)", y = "Area Under Curve", 
-       title = "Area Under Curve for Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
+       title = "Area Under Curve") +
   theme(strip.text = element_text(face="bold", size = 14),
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
 
 ggsave("072623_areaUnderCurvePlot_avg.png", plot = auc_plot_avg_0726)
 
+
+all_genes_plots <- ggarrange(dnaA_plot, fusA_plot, proS_plot, ftsB_plot, nrow =2, ncol = 2)
+
+summarized_metrics <- ggarrange(lagtime_plot_avg_0726, maxgrowthrate_plot_avg_0726, auc_plot_avg_0726, nrow = 1, ncol = 3, 
+                                common.legend = T, legend = "right")
+
+summarized_metrics <- annotate_figure(summarized_metrics, fig.lab = "From July 26, 2023", fig.lab.pos = "bottom.right",
+                                      fig.lab.face = "bold", fig.lab.size = 12)
+
+ggsave("072623_metrics_avg.jpg", plot = summarized_metrics)
 ```
 
 
