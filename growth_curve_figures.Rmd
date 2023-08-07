@@ -1,0 +1,919 @@
+---
+title: "growth_curve_analysis_071223"
+author: "Sierra Mellor"
+date: "2023-06-30"
+output: html_document
+---
+
+gcplyr walk-through: https://mikeblazanin.github.io/gcplyr/articles/gcplyr.html 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install Packages
+Only need to install packages once
+
+```{r}
+install.packages("gcplyr")
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("lubridate")
+install.packages("ggpubr")
+install.packages("ggthemes")
+install.packages("ggh4x")
+install.packages("ggsci")
+```
+
+## Load Libraries
+Load libraries every time
+
+```{r, echo=FALSE}
+library(gcplyr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(ggpubr)
+library(ggthemes)
+library(ggh4x)
+library(tidyr)
+library(ggsci)
+
+# theme for plot
+# found at https://github.com/koundy/ggplot_theme_Publication/blob/master/ggplot_theme_Publication-2.R 
+source("ggplot_theme_Publication-2.R")
+```
+
+## Import and Transform Data
+Save data in .csv format first
+
+```{r}
+# import 07/26 data
+wide_data_0718_dnaA <- read_wides("071823_gc_data_plate1.csv") # data from plate 1
+wide_data_0718_fusA <- read_wides("071823_gc_data_plate2.csv") # data from plate 2
+wide_data_0718_proS <- read_wides("071823_gc_data_plate3.csv") # data from plate 3
+wide_data_0718_ftsB <- read_wides("071823_gc_data_plate4.csv") # data from plate 4
+
+
+## transform to tidy format
+tidy_data_0718_dnaA <- trans_wide_to_tidy(
+  wides = wide_data_0718_dnaA,
+  id_cols = c("file", "Time"))
+
+tidy_data_0718_fusA <- trans_wide_to_tidy(
+  wides = wide_data_0718_fusA,
+  id_cols = c("file", "Time"))
+
+tidy_data_0718_proS <- trans_wide_to_tidy(
+  wides = wide_data_0718_proS,
+  id_cols = c("file", "Time"))
+
+tidy_data_0718_ftsB <- trans_wide_to_tidy(
+  wides = wide_data_0718_ftsB,
+  id_cols = c("file", "Time"))
+
+# import 06/28 data
+wide_data_0627 <- read_wides("ftsZpidSpryC_growthCurves_06282023_cleanData.csv")
+#str(wide_data_0627)
+#head(wide_data_0627)
+
+# transform to tidy format
+tidy_data_0627 <- trans_wide_to_tidy(
+  wides = wide_data_0627,
+  id_cols = c("file", "Time", "Temp"))
+
+# import 08/03 data
+wide_data_0803_plate1 <- read_wides("080323_gc_data_plate1.csv") # data from plate 1
+wide_data_0803_plate2 <- read_wides("080323_gc_data_plate2.csv") # data from plate 2
+wide_data_0803_plate3 <- read_wides("080323_gc_data_plate3.csv") # data from plate 3
+
+## transform to tidy format
+# tidy-shaped: each unique measurement has its own row
+# use trans_wide_to_tidy, specify wide data frame and which columns are not data
+tidy_data_0803_plate1 <- trans_wide_to_tidy(
+  wides = wide_data_0803_plate1,
+  id_cols = c("file", "Time"))
+
+tidy_data_0803_plate2 <- trans_wide_to_tidy(
+  wides = wide_data_0803_plate2,
+  id_cols = c("file", "Time"))
+
+tidy_data_0803_plate3 <- trans_wide_to_tidy(
+  wides = wide_data_0803_plate3,
+  id_cols = c("file", "Time"))
+```
+
+## Create Design Information
+
+Variables: Guide #, ATC_uM, Replicate, Vector, Gene, PAM
+```{r}
+# design for first plate
+design_0718_dnaA <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("14", "15", "16"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "AABBCC", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3,1,2,3,1,2,3),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "AB",
+    FALSE
+  ), # set design for plasmid
+  Gene = list(
+    c("dnaA"),
+    2:7,
+    2:10,
+    "A",
+    FALSE
+  ),
+  PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "AABBCC",
+    FALSE
+  )
+)
+
+# design for second plate
+design_0718_fusA <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("17", "18", "19"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "AABBCC", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3,1,2,3,1,2,3),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "AB",
+    FALSE
+  ), # set design for plasmid
+    Gene = list(
+    c("fusA"),
+    2:7,
+    2:10,
+    "A",
+    FALSE
+  ), 
+    PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "AABBCC",
+    FALSE
+  )
+)
+
+# design for third plate
+design_0718_proS <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("20", "21", "22"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "AABBCC", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3,1,2,3,1,2,3),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "AB",
+    FALSE
+  ), # set design for plasmid
+      Gene = list(
+    c("proS"),
+    2:7,
+    2:10,
+    "A",
+    FALSE
+  ), 
+    PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "AABBCC",
+    FALSE
+  )
+)
+
+# design for fourth plate
+design_0718_ftsB <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("23", "24", "25"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "AABBCC", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0,0,0.4,0.4,0.4,1,1,1),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3,1,2,3,1,2,3),
+    2:7,
+    2:10,
+    "ABCDEFGHI",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "AB",
+    FALSE
+  ), # set design for plasmid
+  Gene = list(
+    c("ftsB"),
+    2:7,
+    2:10,
+    "A",
+    FALSE
+  ), 
+  PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "AABBBB",
+    FALSE
+  )
+)
+
+# design for 06/27 data
+# make it so variables are the same as the other plates
+design_0627 <- read_tidys("062823_growthCurve_design.csv")
+
+design_0627 <- design_0627 %>% 
+  rename(Vector = Plasmid, ATC_uM = uM_ATC) %>%
+  mutate(Gene = case_when(is.na(Guide) ~ NA,
+                          Guide == "empty" ~ "empty",
+                          !is.na(Guide) ~ "ftsZ")) %>%
+  mutate(PAM = case_when(Guide == "empty" ~ "empty",
+                         Guide == "10" ~ "NGG",
+                         Guide %in% c("11", "12") ~ "NAN",
+                         Guide == "13" ~ "NNN")) %>%
+  select(Well, Guide, ATC_uM, Replicate, Vector, Gene, PAM)
+
+# design for 08/03 data
+# design for first plate
+design_0803_plate1 <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "AACCDD", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0.4,1),
+    2:7,
+    2:10,
+    "AAABBBCCC",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3),
+    2:7,
+    2:10,
+    "ABC",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "ABABAB",
+    FALSE
+  ), # set design for plasmid
+    Gene = list(
+    c("ftsZ", "dnaA", "fusA", "proS", "ftsB", "empty"),
+    2:7,
+    2:10,
+    "A",
+    FALSE
+    ), # set design for gene
+  PAM = list(
+    c("NGG", "NAN", "NNN"),
+    2:7,
+    2:10,
+    "AABBCC",
+    FALSE
+  )
+) 
+
+design_0803_plate2 <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "HIJRRR", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0.4,1),
+    2:7,
+    2:10,
+    "AAABBBCCC",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3),
+    2:7,
+    2:10,
+    "ABC",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "AAAABA",
+    FALSE
+  ), # set design for plasmid
+    Gene = list(
+    c("ftsZ", "dnaA", "fusA", "proS", "ftsB", "empty"),
+    2:7,
+    2:10,
+    "CCCFFF",
+    FALSE
+    ), # set design for gene
+  PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "ABCDDD",
+    FALSE
+  )
+)
+
+
+design_0803_plate3 <- make_design(
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    2:10, # columns to apply to
+    "NPQQRR", # pattern of the values
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0.4,1),
+    2:7,
+    2:10,
+    "AAABBBCCC",
+    TRUE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3),
+    2:7,
+    2:10,
+    "ABC",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    2:10,
+    "AAABAB",
+    FALSE
+  ), # set design for plasmid
+    Gene = list(
+    c("ftsZ", "dnaA", "fusA", "proS", "ftsB", "empty"),
+    2:7,
+    2:10,
+    "EEEEFF",
+    FALSE
+    ), # set design for gene
+  PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    2:10,
+    "ABCCDD",
+    FALSE
+  )
+)
+
+```
+
+## Merge and Clean up Data
+
+```{r}
+# merge data and design data frames
+data_design_0718_dnaA <- merge_dfs(tidy_data_0718_dnaA, design_0718_dnaA)
+data_design_0718_fusA <- merge_dfs(tidy_data_0718_fusA, design_0718_fusA)
+data_design_0718_proS <- merge_dfs(tidy_data_0718_proS, design_0718_proS)
+data_design_0718_ftsB <- merge_dfs(tidy_data_0718_ftsB, design_0718_ftsB)
+data_design_0627 <- merge_dfs(tidy_data_0627, design_0627) %>% select(-Temp)
+data_design_0803_plate1 <- merge_dfs(tidy_data_0803_plate1, design_0803_plate1)
+data_design_0803_plate2 <- merge_dfs(tidy_data_0803_plate2, design_0803_plate2)
+data_design_0803_plate3 <- merge_dfs(tidy_data_0803_plate3, design_0803_plate3)
+
+data_0803 <- rbind(data_design_0803_plate1,
+                         data_design_0803_plate2,
+                         data_design_0803_plate3) %>%
+  filter(Gene %in% c("ftsB", "empty"))
+
+# put together data from all runs
+data_design_all <- rbind(data_design_0718_dnaA,
+                         data_design_0718_ftsB,
+                         data_design_0718_fusA,
+                         data_design_0718_proS,
+                         data_design_0627,
+                         data_0803)
+
+# convert time to numeric
+# hms() since data has hours, minutes, and seconds (use hm() for hours & minutes)
+# set unit to be hours (defaults to seconds)
+data_design_all$Time <- time_length(hms(data_design_all$Time), unit = "hour")
+
+
+# reorder Well, Guide, Gene, and PAM levels so they appear in the correct order
+# this part generates A1-H12: paste(rep(LETTERS[1:8], each=12), 1:12, sep="")
+data_design_all$Well <- factor(data_design_all$Well,
+                                       levels=paste(rep(LETTERS[1:8], each=12), 1:12, sep=""))
+data_design_all$Guide <- factor(data_design_all$Guide,
+                                        levels=c("10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty"))
+
+data_design_all$Gene <- factor(data_design_all$Gene, levels = c("dnaA", "fusA", "proS", "ftsB", "ftsZ", "empty"))
+
+data_design_all$PAM <- factor(data_design_all$PAM, levels = c("NGG", "NAN", "NNN", "empty"))
+
+# omit NA wells (use to plot only experimental wells)
+# prepare choice of guides/data for figure
+data_design_filtered <- data_design_all %>%
+  filter(!is.na(Guide)) %>%
+  filter(ATC_uM != 1)
+
+# average replicates together
+data_design_averages <- data_design_filtered %>%
+  group_by(Time, Guide, ATC_uM, Vector, Gene, PAM) %>%
+  summarize(Average = mean(Measurements)) %>%
+  ungroup()
+
+```
+
+## Plot Curves
+
+```{r}
+
+guide_labs <- c("NGG", "NAN", "NNN", "NGG", "NAN", "NNN", "NGG", "NAN", "NNN", "NGG", "NAN", "NAN", "NNN", "Empty")
+names(guide_labs) <- c("14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "empty")
+
+# set up dataset to allow for plotting empty in an entire row
+neg_control_data <- subset(data_design_averages, Gene == "empty")
+
+experimental_data <- subset(data_design_averages, Gene != "empty")
+experimental_data$facet <- experimental_data$Gene
+baseline_all_facets = merge(neg_control_data, data.frame(Gene = "empty", facet = experimental_data$facet))
+
+data_for_plotting <- rbind(baseline_all_facets, experimental_data) 
+
+
+# plot uninduced vs induced based on PAM site, gene, and vector
+growth_curves_all <- ggplot(data_for_plotting, aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.05, se=FALSE) +
+  facet_nested(rows = vars(PAM), cols = vars(facet, Vector)) +
+  xlim(0, 16) +
+  theme_bw() +
+  labs(y = "OD at 600nm", x = "Time (hours)") +
+  theme(legend.title = element_blank(),
+        axis.title = element_text(size = 24), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 22, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"), labels = c("uninduced (0 μM ATC)", "induced (0.4 μM ATC)"))
+
+ggsave("final_growth_curve_plot.png", plot = growth_curves_all)
+
+# theme ideas: theme_bw, theme_few, theme_pubr, labs_pubr
+
+# ftsZ plot
+ftsZ_data <- data_design_averages %>%
+  filter(Gene %in% c("ftsZ", "empty"))
+
+neg_control_data_1 <- subset(ftsZ_data, PAM == "empty")
+
+experimental_data_1 <- subset(ftsZ_data, PAM != "empty")
+experimental_data_1$facet <- experimental_data_1$PAM
+baseline_all_facets_1 = merge(neg_control_data_1, data.frame(PAM = "empty", facet = experimental_data_1$facet))
+
+data_for_plotting_1 <- rbind(baseline_all_facets_1, experimental_data_1) 
+
+ftsZ_plot <- ggplot(ftsZ_data, aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.25, se=FALSE) +
+  facet_grid(rows = vars(PAM), cols = vars(Vector)) +
+  xlim(0, 16) +
+  theme_bw() +
+  labs(y = "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(legend.title = element_text(size = 24, face = "bold"),
+        axis.title = element_text(size = 24), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 22, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"))
+
+ggsave("ftsZ_plot.png", plot = ftsZ_plot)
+
+dnaA_plot <- ggplot(data_design_averages %>% filter(Gene == "dnaA"), aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.15, se=FALSE) +
+  facet_grid(rows = vars(PAM), cols = vars(Vector)) +
+  xlim(0, 16) +
+  theme_bw() +
+  labs(title = "dnaA", y = "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(title = element_text(size = 24, face = "bold"),
+        legend.title = element_text(size = 20, face = "bold"),
+        axis.title = element_blank(),#element_text(size = 24), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 22, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"))
+
+fusA_plot <- ggplot(data_design_averages %>% filter(Gene == "fusA"), aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.15, se=FALSE) +
+  facet_grid(rows = vars(PAM), cols = vars(Vector)) +
+  xlim(0, 16) +
+  theme_bw() +
+  labs(title = "fusA", y = "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(title = element_text(size = 24, face = "bold"),
+        legend.title = element_text(size = 24, face = "bold"),
+        axis.title = element_blank(),#element_text(size = 24), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 22, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"))
+
+proS_plot <- ggplot(data_design_averages %>% filter(Gene == "proS"), aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.15, se=FALSE) +
+  facet_grid(rows = vars(PAM), cols = vars(Vector)) +
+  xlim(0, 16) +
+  theme_bw() +
+  labs(title = "proS", y= "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(title = element_text(size = 24, face = "bold"),
+        legend.title = element_text(size = 24, face = "bold"),
+        axis.title = element_blank(),#element_text(size = 24), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 22, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"))
+
+ftsB_plot <- ggplot(data_design_averages %>% filter(Gene == "ftsB"), aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.15, se=FALSE) +
+  facet_grid(rows = vars(Guide), cols = vars(Vector),
+             labeller = labeller(Guide = guide_labs)) +
+  xlim(0, 16) +
+  theme_bw() +
+  labs(title = "ftsB", y = "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(title = element_text(size = 24, face = "bold"),
+        legend.title = element_text(size = 24, face = "bold"),
+        axis.title = element_blank(),#element_text(size = 24), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 22, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"))
+
+all_genes_plots <- ggarrange(dnaA_plot, fusA_plot, proS_plot, ftsB_plot, nrow =1, ncol = 4, common.legend = T, legend = "bottom")
+
+ggsave("essential_genes_plot.png", plot = all_genes_plots, dpi = 700)
+```
+
+
+## Calculate lag time, max growth rate, area under curve (total growth)
+
+```{r}
+# calculate per capita derivative
+# include trans_y and window_width_n for smoothing if data is really "jumpy" (may not be needed)
+data_design_0726_filtered <- data_design_0726_filtered %>%
+  group_by(Well, Guide, ATC_uM, Vector, Gene, Replicate) %>%
+  mutate(deriv_percap = calc_deriv(x=Time, y=Measurements, percapita = T, blank = 0,
+                                   window_width_n=5, trans_y="log")) %>%
+  ungroup()
+
+
+# plot per capita derivatives
+ggplot(data=data_design_0726_filtered, aes(x=Time, y=deriv_percap)) +
+  geom_line() +
+  facet_wrap(~Well+file, scales="free")
+
+# calculate lag time, maximum growth rate, time at maximum growth rate, area under curve
+# group by all variables so that you end up with one row per well
+# make sure not to group by anything that varies within a well
+data_0726_sum <- data_design_0726_filtered %>%
+  group_by(file, Well, Guide, ATC_uM, Vector, Replicate, Gene, PAM) %>%
+  summarize(min_dens = first_minima(Measurements, return="y"), # use for calculating lag time
+    lag_time = lag_time(y=Measurements, x=Time, deriv = deriv_percap, y0 = min_dens), # lag time
+    max_growth_rate = max_gc(deriv_percap, na.rm=T), # maximum growth rate
+    time_max_growth = extr_val(Time, which_max_gc(deriv_percap)), # time at maximum growth rate
+    area_under_curve = auc(x=Time, y=Measurements)) %>% # area under curve
+  ungroup()
+
+# plot lag time
+lagtime_plot_0726 <- ggplot(data_0726_sum, aes(x=ATC_uM, y=lag_time, color = ATC_uM)) +
+  geom_point() +
+  facet_grid(rows = vars(Gene), cols = vars(Vector, PAM),
+             labeller = labeller(Guide = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", 
+       title = "Lag Time for Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("072623_lagTimePlot.png", plot = lagtime_plot_0726)
+
+# plot max growth rate
+maxgrowthrate_plot_0726 <- ggplot(data_0726_sum, aes(x=ATC_uM, y=max_growth_rate, color = ATC_uM)) +
+  geom_point() +
+  facet_grid(rows = vars(Gene), cols = vars(Vector, PAM),
+             labeller = labeller(Guide = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", 
+       title = "Maximum Growth Rates for Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("072623_maxGrowthRatePlot.png", plot = maxgrowthrate_plot_0726)
+
+# plot area under curve
+auc_plot_0726 <- ggplot(data_0726_sum, aes(x=ATC_uM, y=area_under_curve, color = ATC_uM)) +
+  geom_point() +
+  facet_grid(rows = vars(Gene), cols = vars(Vector, PAM),
+             labeller = labeller(Guide = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Area Under Curve", 
+       title = "Area Under Curve for Guides 14-26 Growth Assay", caption = "From July 26, 2023") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("072623_areaUnderCurvePlot.png", plot = auc_plot_0726)
+
+
+# average out replicates
+data_0726_sum_avg <- data_0726_sum %>%
+  group_by(file, Guide, ATC_uM, Vector, Gene, PAM) %>%
+  summarize(lag_time_avg = mean(lag_time),
+            max_growth_rate_avg = mean(max_growth_rate),
+            auc_avg = mean(area_under_curve)) %>%
+  ungroup() %>%
+  mutate(Group = case_when(Guide == "empty" ~ "Empty",
+                           Guide != "empty" ~ "Experimental"))
+
+# create dataset that will allow for plotting empty as a baseline on all graphs
+neg_control_avg_data <- subset(data_0726_sum_avg, Guide == "empty")
+
+experimental_avg_data <- subset(data_0726_sum_avg, Guide != "empty")
+experimental_avg_data$facet <-experimental_avg_data$Guide
+baseline_all_facets_sum = merge(neg_control_avg_data, data.frame(Guide = "empty", facet = experimental_avg_data$facet))
+
+plot_data_sum <- rbind(baseline_all_facets_sum, experimental_avg_data)
+
+# lag time plot w baseline
+lagtime_plot_avg_0726 <- ggplot(plot_data_sum, aes(x = ATC_uM, y= lag_time_avg, color = Group)) +
+  geom_point() +
+  facet_grid(rows = vars(facet),
+             labeller = labeller(facet = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Lag Time (Hours)", 
+       title = "Lag Time",) +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("072623_lagtimeplot_avg.png", plot = lagtime_plot_avg_0726)
+
+# max growth rate plot w baseline
+maxgrowthrate_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=max_growth_rate_avg, color = Group)) +
+  geom_point() +
+  facet_grid(rows = vars(facet),
+             labeller = labeller(facet = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Maximum Growth Rate", 
+       title = "Maximum Growth Rate") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("072623_maxGrowthRatePlot_avg.png", plot = maxgrowthrate_plot_avg_0726)
+
+# area under curve plot w baseline
+auc_plot_avg_0726 <- ggplot(plot_data_sum, aes(x=ATC_uM, y=auc_avg, color = Group)) +
+  geom_point() +
+  facet_grid(rows = vars(facet),
+             labeller = labeller(facet = guide_labs)) +
+  theme_bw() +
+  labs(x="ATC Concentration (uM)", y = "Area Under Curve", 
+       title = "Area Under Curve") +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+ggsave("072623_areaUnderCurvePlot_avg.png", plot = auc_plot_avg_0726)
+
+
+all_genes_plots <- ggarrange(dnaA_plot, fusA_plot, proS_plot, ftsB_plot, nrow =2, ncol = 2)
+
+summarized_metrics <- ggarrange(lagtime_plot_avg_0726, maxgrowthrate_plot_avg_0726, auc_plot_avg_0726, nrow = 1, ncol = 3, 
+                                common.legend = T, legend = "right")
+
+summarized_metrics <- annotate_figure(summarized_metrics, fig.lab = "From July 26, 2023", fig.lab.pos = "bottom.right",
+                                      fig.lab.face = "bold", fig.lab.size = 12)
+
+ggsave("072623_metrics_avg.jpg", plot = summarized_metrics)
+```
+
+
+# GuideFinder data
+```{r}
+# color palletes
+my_colors_1 <- RColorBrewer::brewer.pal("Pastel1", n=9)
+my_colors_2 <- RColorBrewer::brewer.pal("Pastel2", n=8)
+
+# read in data
+GuideFinder_stats <- read.csv("~/Documents/GitHub/Guide-Finder/GuideFinder-Mac/S_epi_5/Sepi5_OverallGeneInfo_AllRuns.csv") %>%
+  mutate(original_parameters = Genes_With_Top_Hits_Filtered/Total_Genes) %>%
+  mutate(lowered_thresholds = Total_Genes_With_Guides/Total_Genes) %>%
+  pivot_longer(cols = c(original_parameters, lowered_thresholds), names_to = "parameters", values_to = "percent_genes")
+
+GuideFinder_stats$PAM <- factor(GuideFinder_stats$PAM, levels = c("NGG", "NAN", "NNN"))
+GuideFinder_stats$parameters <- factor(GuideFinder_stats$parameters, levels = c("original_parameters", "lowered_thresholds"))
+
+# get averages for stats:
+GuideFinder_stats_wide <- GuideFinder_stats <- read.csv("~/Documents/GitHub/Guide-Finder/GuideFinder-Mac/S_epi_5/Sepi5_OverallGeneInfo_AllRuns.csv") %>%
+  mutate(percent_genes = Genes_With_Top_Hits_Filtered/Total_Genes) %>%
+  mutate(percent_genes_lowered = Total_Genes_With_Guides/Total_Genes)
+
+GuideFinder_stats_wide %>% group_by(PAM) %>%
+  summarize(avg_useable_guides = mean(Useable_Guides), 
+            avg_useable_guides_lowered = mean(Total_Useable_Guides),
+            avg_percent_genes = mean(percent_genes),
+            avg_percent_genes_lowered = mean(percent_genes_lowered),
+            avg_runtime = mean(Runtime, na.rm=T),
+            avg_genes_with_guides = mean(Genes_With_Guide_Sites/Total_Genes))
+
+
+# GuideFinder boxplot
+GuideFinder_boxplot <- ggplot(data = GuideFinder_stats, aes(x=PAM, y = percent_genes, fill =parameters)) +
+  geom_boxplot() +
+  theme_bw() +
+  scale_fill_manual(values = my_colors_1[c(2,1)]) +
+  labs(x = "PAM Site", y = "Proportion of Genes with Guides") +
+  theme(legend.position = "none",
+        axis.title = element_text(size = 18), # 16 to 20
+        axis.text = element_text(size = 16)) +
+  ylim(0.7,1)
+
+# guideFinder percent genes data
+# alternate dataset
+GuideFinder_stats_1 <- read.csv("~/Documents/GitHub/Guide-Finder/GuideFinder-Mac/S_epi_5/Sepi5_OverallGeneInfo_AllRuns.csv") %>%
+  mutate(original_parameters = Genes_With_Top_Hits_Filtered/Total_Genes) %>%
+  mutate(lowered_thresholds = GenesGainedFromLoweringThresholds/Total_Genes) %>%
+  pivot_longer(cols = c(original_parameters, lowered_thresholds), names_to = "parameters", values_to = "percent_genes")
+
+GuideFinder_stats_1$PAM <- factor(GuideFinder_stats_1$PAM, levels = c("NGG", "NAN", "NNN"))
+
+# stacked bars
+strain_guidefinder_plot <- ggplot(data = GuideFinder_stats_1, aes(x=Genome, y=percent_genes, fill = factor(parameters, levels = c("lowered_thresholds", "original_parameters")), group = interaction(Genome, parameters))) +
+  geom_col(position="stack", color = "black") +
+  facet_wrap(~PAM) +
+  theme_bw() +
+  labs(x="Strain", y= "Proportion of Genes with Guides", fill = "Filtering Thresholds") +
+  theme(legend.title = element_text(size = 18, face="bold"),
+        axis.title = element_text(size = 18), # 16 to 20
+        axis.text = element_text(size = 16), # 12 to 16
+        strip.text = element_text(size = 18, face="bold"),
+        legend.text = element_text(size = 16),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(fill = guide_legend(byrow = T)) +
+  scale_fill_brewer(palette = "Pastel1", labels = c("Lowered Thresholds", "Original Thresholds")) 
+
+ggsave("guidefinder_comparison_plot.png", plot = strain_guidefinder_plot, dpi = 700)
+
+
+# for genes that have no PAMless guides, cds has hits to genes with these gene functions 
+noPAMless <- read.csv("~/Documents/GitHub/Guide-Finder/GuideFinder-Mac/S_epi_5/shared_function_noPAMless.csv")
+
+NIHLM018 <- noPAMless %>%
+  filter(Genome == "NIHLM018")
+NIHLM018$Shared_Function <- factor(NIHLM018$Shared_Function, levels=NIHLM018$Shared_Function[order(NIHLM018$Percent,decreasing=F)])
+
+NIHLM031 <- noPAMless %>%
+  filter(Genome == "NIHLM031")
+NIHLM031$Shared_Function <- factor(NIHLM031$Shared_Function, levels=NIHLM031$Shared_Function[order(NIHLM031$Percent,decreasing=F)])
+
+# sideways bar plots
+NIHLM018_plot <- ggplot(data = NIHLM018, aes(x = Shared_Function, y = Percent, fill = Shared_Function)) +
+  geom_col(color = "black") +
+  facet_wrap(~Genome) +
+  coord_flip() +
+  theme_bw() +
+  labs(y = "Percent of Genes with no PAM-less Guides") +
+  ylim(0, 0.4) +
+  theme(axis.title = element_blank(),
+        axis.text = element_text(size = 14),
+        strip.text = element_text(size = 18, face="bold")) +
+  scale_fill_brewer(palette = "Pastel2")
+
+NIHLM031_plot <- ggplot(data = NIHLM031, aes(x = Shared_Function, y = Percent, fill = Shared_Function)) +
+  geom_col(color = "black") +
+  facet_wrap(~Genome) +
+  coord_flip() +
+  theme_bw() +
+    labs(y = "Proportion of Genes With no NNN Guides") +
+  ylim(0, 0.4) +
+  theme(axis.title.y = element_blank(),
+        axis.text = element_text(size = 14),
+        strip.text = element_text(size = 18, face="bold"),
+        axis.title.x = element_text(size = 18)) +
+  scale_fill_manual(values = my_colors_2[c(3,1)])
+
+# arrange plots
+noPamlessGuidesPlot <- ggarrange(NIHLM018_plot, NIHLM031_plot, nrow = 2, legend = "none", heights = c(4,2.75))
+
+top_row <- ggarrange(strain_guidefinder_plot, NULL, labels = c("A", ""), nrow = 2, heights = c(9,1), font.label = list(size = 16))
+bottom_row <- ggarrange(GuideFinder_boxplot, NULL, noPamlessGuidesPlot, NULL, labels = c("B", "", "C", ""), widths = c(2,0.5,3,0.5), nrow = 1, font.label = list(size = 16))
+GuideFinder_figure <- ggarrange(top_row, bottom_row, nrow = 2, heights = c(2.5,2))
+
+ggsave(file = "GuideFinder_figure.jpg", plot = GuideFinder_figure, dpi = 700, height = 12, width = 18)
+
+```
+
+
