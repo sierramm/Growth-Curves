@@ -1,0 +1,248 @@
+---
+title: "growth_curve_analysis_071223"
+author: "Sierra Mellor"
+date: "2023-06-30"
+output: html_document
+---
+
+gcplyr walk-through: https://mikeblazanin.github.io/gcplyr/articles/gcplyr.html 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install Packages
+Only need to install packages once
+
+```{r}
+install.packages("gcplyr")
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("lubridate")
+install.packages("ggpubr")
+```
+
+## Load Libraries
+Load libraries every time
+
+```{r, echo=FALSE}
+library(gcplyr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(ggpubr)
+```
+
+## Import and Transform Data
+Save data in .csv format first
+
+```{r}
+## import data as wide format
+# save data in csv format
+# data is wide-shaped (each row is a timepoint, each column is a well from the pate)
+wide_data_0807 <- read_wides("081023_gc_data.csv") # data from plate 1
+
+## transform to tidy format
+# tidy-shaped: each unique measurement has its own row
+# use trans_wide_to_tidy, specify wide data frame and which columns are not data
+tidy_data_0810 <- trans_wide_to_tidy(
+  wides = wide_data_0810,
+  id_cols = c("file", "Time"))
+
+```
+
+## Create Design Information
+
+```{r}
+# design for first plate
+design_0810 <- make_design(
+  output_format = "blocks", # set to "blocks" to check that it's correct, then save as "tidy"
+  nrows = 8, ncols = 12, lookup_tbl_start = "A",
+  Guide = list( 
+    c("17", "18", "19", "empty"), # values
+    2:7, # rows to apply to (those left out will be filled in with NA)
+    1:12, # columns to apply to
+    paste(c(rep("AABBCC", 9), rep("DDDDDD", 3)), collapse = ""),
+    FALSE # indicate whether filled by row (TRUE) or by column (FALSE)
+  ), # set design for guide
+  ATC_uM = list( 
+    c(0,0.1,0.4),
+    2:7,
+    1:12,
+    paste(c(rep("A", 18), rep("B", 18), rep("C", 18), rep("ABC", 6)), collapse = ""),
+    FALSE
+  ), # set design for ATC concentration
+  Replicate = list(
+    c(1,2,3),
+    2:7,
+    1:12,
+    "ABC",
+    TRUE
+  ), # set design for replicates
+  Vector = list(
+    c("pidCas9", "pidSpryC"),
+    2:7,
+    1:12,
+    paste(c(rep("ABABAB", 9), rep("AAABBB", 18)), collapse = ""),
+    FALSE
+  ), # set design for plasmid
+    Gene = list(
+    c("ftsZ", "dnaA", "fusA", "proS", "ftsB", "empty"),
+    2:7,
+    1:12,
+    "C",
+    FALSE
+    ), # set design for gene
+  PAM = list(
+    c("NGG", "NAN", "NNN", "empty"),
+    2:7,
+    1:12,
+    paste(c(rep("AABBCC", 9), rep("DDDDDD", 3)), collapse = ""),
+    FALSE
+  )
+) 
+
+
+```
+
+## Merge and Clean up Data
+
+```{r}
+# merge data and design data frames
+data_design_0810_all <- merge_dfs(tidy_data_0810, design_0810)
+
+
+# convert time to numeric
+# hms() since data has hours, minutes, and seconds (use hm() for hours & minutes)
+# set unit to be hours (defaults to seconds)
+data_design_0810_all$Time <- time_length(hms(data_design_0810_all$Time), unit = "hour")
+
+
+# reorder Well, Guide, Gene, and PAM levels so they appear in the correct order
+# this part generates A1-H12: paste(rep(LETTERS[1:8], each=12), 1:12, sep="")
+data_design_0810_all$Well <- factor(data_design_0810_all$Well,
+                                       levels=paste(rep(LETTERS[1:8], each=12), 1:12, sep=""))
+data_design_0810_all$Guide <- factor(data_design_0810_all$Guide,
+                                        levels=c("17", "18", "19", "empty"))
+
+data_design_0810_all$Gene <- factor(data_design_0810_all$Gene, levels = c("ftsZ", "dnaA", "fusA", "proS", "ftsB", "empty"))
+
+data_design_0810_all$PAM <- factor(data_design_0810_all$PAM, levels = c("NGG", "NAN", "NNN", "empty"))
+
+# omit NA wells (use to plot only experimental wells)
+data_design_0810_filtered <- data_design_0810_all %>%
+  filter(!is.na(Guide))
+
+# exclude other data if needed (contamination, etc)
+
+
+# average technical replicates together
+data_design_0810_averages <- data_design_0810_filtered %>%
+  group_by(Time, Guide, ATC_uM, Vector, Gene, PAM, Sample) %>%
+  summarize(Average = mean(Measurements)) %>%
+  ungroup()
+
+```
+
+## Plot Curves
+
+```{r}
+# labels for ATC concentration
+ATC_labs <- c("0 uM", "0.1 uM", "0.4 uM")
+names(ATC_labs) <- c("0", "0.1", "0.4")
+
+# labels for guides - choose one depending on how you want plot to look
+guide_labs <- c("Guide 338 (NGG)", "Empty")
+
+guide_labs <- c( "NGG", "Empty")
+
+guide_labs <- c("Guide 338", "empty")
+
+guide_labs <- c("ftsZ NGG", "Empty")
+
+names(guide_labs) <- c("JO_0338", "empty")
+
+vector_labs <- c("dCas9", "dSpRYc")
+names(vector_labs) <- c("pidCas9", "pidSpryC")
+
+# plot by well - plate 1 (just to take a look at data)
+ggplot(data = data_design_0810_all, aes(x=Time, y=Measurements, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Well, nrow = 8, ncol = 12)
+
+fusA_plot_0810 <- ggplot(data = data_design_0810_averages %>% filter(ATC_uM != 0.1), aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.25, se = F) +
+  facet_grid(rows = vars(PAM), cols = vars(Vector),
+             labeller = labeller(Vector = vector_labs)) +
+  xlim(0, 14) +
+  theme_bw() +
+  labs(y = "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(legend.title = element_text(size = 24, face = "bold"),
+        axis.title = element_text(size = 26), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 26, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T)) +
+  scale_color_manual(values = c("blue","red"))
+
+ggsave("fusA_plot_0810.jpg", dpi = 700, height = 10, width = 16)
+
+
+
+
+
+# plot by well - plate 2 (just to take a look at data)
+ggplot(data = data_design_0803_plate2, aes(x=Time, y=Measurements, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Well, nrow = 6, ncol = 9)
+
+ggplot(data = data_design_0803_plate3, aes(x=Time, y=Measurements, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Well, nrow = 6, ncol = 9)
+
+
+# plot with everything
+growth_curve_plot_0807 <- ggplot(data = data_design_0807_filtered, aes(x=Time, y=Measurements, color = Replicate)) +
+  geom_line() +
+  facet_grid(rows=vars(Gene, Guide, Sample), cols = vars(Vector, ATC_uM),
+             labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
+  labs(y = "OD 600", x = "Time (hours)", 
+       title = "S. aureus Growth Assay", caption = "From Aug 7, 2023") +
+  theme_bw() +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+# save plot
+ggsave("080723_growthcurves.png", plot =growth_curve_plot_0807)
+
+
+# plot with averages of replicates
+growth_curve_averages_0807 <- ggplot(data = data_design_0807_averages_1, aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_line() +
+  facet_wrap(~Gene + Vector + Guide + Sample, ncol = 3,
+             labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
+  labs(y = "OD 600", x = "Time (hours)", 
+       title = "S. aureus Growth Assay", caption = "From Aug 7, 2023") +
+  theme_bw() +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+growth_curve_averages_0807_2 <- ggplot(data = data_design_0807_averages_2, aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_line() +
+  facet_grid(rows = vars(Guide), cols = vars(Vector),
+             labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs)) +
+  labs(y = "OD 600", x = "Time (hours)", 
+       title = "S. aureus Growth Assay", caption = "From Aug 7, 2023") +
+  theme_bw() +
+  theme(strip.text = element_text(face="bold", size = 14),
+        title = element_text(face = "bold", size = 18),
+        axis.text = element_text(size = 12))
+
+# save plot
+ggsave("080723_growthcurves_average.png", plot = growth_curve_averages_0807_2)
+
+
+```
