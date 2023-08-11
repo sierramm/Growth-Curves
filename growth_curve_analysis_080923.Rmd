@@ -453,11 +453,12 @@ ftsZ_plot_0809 <- ggplot(data = data_design_0809_averages_2 %>% filter(Gene %in%
         title = element_text(face = "bold", size = 18),
         axis.text = element_text(size = 12))
 
-ftsB_plot_1_0809 <- ggplot(data = data_design_0809_averages_2 %>% filter(Gene %in% c("ftsB", "empty")), aes(x=Time, y=Average, color = ATC_uM)) +
-  geom_smooth(span=0.15, se=FALSE) +
+ftsB_plot_1_0809 <- ggplot(data = data_design_0809_averages_2 %>% filter(Gene %in% c("ftsB", "empty"), ATC_uM != 0.1), aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.35, se=FALSE) +
+  xlim(0,11) +
   facet_nested(rows=vars(PAM), cols = vars(Gene, Vector),
              labeller = labeller(ATC_uM = ATC_labs, Guide = guide_labs, Vector = vector_labs)) +
-  labs(y = "OD at 600nm", x = "Time (hours)", title = "ftsB guides - multi plate reader") +
+  labs(y = "OD at 600nm", x = "Time (hours)") +
   theme_bw() +
   theme(title = element_text(size = 24, face = "bold"),
         legend.title = element_text(size = 20, face = "bold"),

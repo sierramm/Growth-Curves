@@ -40,7 +40,7 @@ Save data in .csv format first
 ## import data as wide format
 # save data in csv format
 # data is wide-shaped (each row is a timepoint, each column is a well from the pate)
-wide_data_0807 <- read_wides("081023_gc_data.csv") # data from plate 1
+wide_data_0810 <- read_wides("081023_gc_data.csv") # data from plate 1
 
 ## transform to tidy format
 # tidy-shaped: each unique measurement has its own row
@@ -56,7 +56,7 @@ tidy_data_0810 <- trans_wide_to_tidy(
 ```{r}
 # design for first plate
 design_0810 <- make_design(
-  output_format = "blocks", # set to "blocks" to check that it's correct, then save as "tidy"
+  output_format = "tidy", # set to "blocks" to check that it's correct, then save as "tidy"
   nrows = 8, ncols = 12, lookup_tbl_start = "A",
   Guide = list( 
     c("17", "18", "19", "empty"), # values
@@ -83,7 +83,7 @@ design_0810 <- make_design(
     c("pidCas9", "pidSpryC"),
     2:7,
     1:12,
-    paste(c(rep("ABABAB", 9), rep("AAABBB", 18)), collapse = ""),
+    paste(c(rep("ABABAB", 9), rep("AAABBB", 3)), collapse = ""),
     FALSE
   ), # set design for plasmid
     Gene = list(
@@ -138,7 +138,7 @@ data_design_0810_filtered <- data_design_0810_all %>%
 
 # average technical replicates together
 data_design_0810_averages <- data_design_0810_filtered %>%
-  group_by(Time, Guide, ATC_uM, Vector, Gene, PAM, Sample) %>%
+  group_by(Time, Guide, ATC_uM, Vector, Gene, PAM) %>%
   summarize(Average = mean(Measurements)) %>%
   ungroup()
 
@@ -169,6 +169,28 @@ names(vector_labs) <- c("pidCas9", "pidSpryC")
 ggplot(data = data_design_0810_all, aes(x=Time, y=Measurements, color = ATC_uM)) +
   geom_line() +
   facet_wrap(~Well, nrow = 8, ncol = 12)
+
+ggplot(data = data_design_0810_averages, aes(x=Time, y=Average, color = ATC_uM)) +
+  geom_smooth(span=0.15, se = F) +
+  facet_grid(rows = vars(PAM), cols = vars(Vector),
+             labeller = labeller(Vector = vector_labs)) +
+  xlim(0, 14) +
+  theme_bw() +
+  labs(y = "OD at 600nm", x = "Time (hours)", color = "ATC (μM)") +
+  theme(legend.title = element_text(size = 24, face = "bold"),
+        axis.title = element_text(size = 26), # 16 to 20
+        axis.text = element_text(size = 20), # 12 to 16
+        strip.text = element_text(size = 26, face="bold"),
+        legend.text = element_text(size = 22),
+        legend.spacing.y = unit(0.5, "cm")) +
+  guides(color = guide_legend(byrow = T))
+
+ggplot(data = data_design_0810_filtered, aes(x=Time, y=Measurements, color = Replicate)) +
+  geom_line() +
+  facet_grid(rows = vars(Gene, PAM), cols = vars(Vector, ATC_uM)) +
+  theme_bw() +
+  labs(title = "fusA Growth Assay", caption = "From Aug 10, 2023")
+
 
 fusA_plot_0810 <- ggplot(data = data_design_0810_averages %>% filter(ATC_uM != 0.1), aes(x=Time, y=Average, color = ATC_uM)) +
   geom_smooth(span=0.25, se = F) +
